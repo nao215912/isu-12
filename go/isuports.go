@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"sort"
+	// "sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -1445,57 +1445,94 @@ func competitionRankingHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
-	pss := []PlayerScoreRow{}
+	// pss := []PlayerScoreRow{}
+	ranks := []CompetitionRank{}
 	if err := tenantDB.SelectContext(
 		ctx,
-		&pss,
-		"SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC",
+		&ranks,
+		`
+	SELECT
+		ROW_NUMBER() OVER (ORDER BY ps.score DESC, ps.row_num DESC) as rank,
+		ps.score as score,
+		ps.player_id as player_id,
+		p.display_name as player_display_name
+		ps.row_num as row_num
+	FROM
+		player_score as ps
+	INNER JOIN
+		player as p ON ps.player_id = p.id
+	INNER JOIN (
+		SELECT
+			player_id,
+			MAX(row_num) as max_row_num
+		FROM
+			player_score
+		WHERE
+			tenant_id = ?
+			AND competition_id = ?
+		GROUP BY
+			player_id
+	) as sub_ps ON ps.player_id = sub_ps.player_id AND ps.row_num = sub_ps.max_row_num
+	WHERE
+		ps.tenant_id = ?
+		AND ps.competition_id = ?
+	ORDER BY
+		ps.score DESC, ps.row_num DESC
+	LIMIT 
+		100
+	OFFSET
+		?
+	`,
 		tenant.ID,
 		competitionID,
+		tenant.ID,
+		competitionID,
+		rankAfter,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
 	}
-	ranks := make([]CompetitionRank, 0, len(pss))
-	scoredPlayerSet := make(map[string]struct{}, len(pss))
-	for _, ps := range pss {
-		// player_scoreが同一player_id内ではrow_numの降順でソートされているので
-		// 現れたのが2回目以降のplayer_idはより大きいrow_numでスコアが出ているとみなせる
-		if _, ok := scoredPlayerSet[ps.PlayerID]; ok {
-			continue
-		}
-		scoredPlayerSet[ps.PlayerID] = struct{}{}
-		p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
-		if err != nil {
-			return fmt.Errorf("error retrievePlayer: %w", err)
-		}
-		ranks = append(ranks, CompetitionRank{
-			Score:             ps.Score,
-			PlayerID:          p.ID,
-			PlayerDisplayName: p.DisplayName,
-			RowNum:            ps.RowNum,
-		})
-	}
-	sort.Slice(ranks, func(i, j int) bool {
-		if ranks[i].Score == ranks[j].Score {
-			return ranks[i].RowNum < ranks[j].RowNum
-		}
-		return ranks[i].Score > ranks[j].Score
-	})
-	pagedRanks := make([]CompetitionRank, 0, 100)
-	for i, rank := range ranks {
-		if int64(i) < rankAfter {
-			continue
-		}
-		pagedRanks = append(pagedRanks, CompetitionRank{
-			Rank:              int64(i + 1),
-			Score:             rank.Score,
-			PlayerID:          rank.PlayerID,
-			PlayerDisplayName: rank.PlayerDisplayName,
-		})
-		if len(pagedRanks) >= 100 {
-			break
-		}
-	}
+
+	// scoredPlayerSet := make(map[string]struct{}, len(pss))
+	// for _, ps := range pss {
+	// 	// player_scoreが同一player_id内ではrow_numの降順でソートされているので
+	// 	// 現れたのが2回目以降のplayer_idはより大きいrow_numでスコアが出ているとみなせる
+	// 	if _, ok := scoredPlayerSet[ps.PlayerID]; ok {
+	// 		continue
+	// 	}
+	// 	scoredPlayerSet[ps.PlayerID] = struct{}{}
+	// 	// "SELECT * FROM player WHERE id = ?"
+	// 	p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
+	// 	if err != nil {
+	// 		return fmt.Errorf("error retrievePlayer: %w", err)
+	// 	}
+	// 	ranks = append(ranks, CompetitionRank{
+	// 		Score:             ps.Score,
+	// 		PlayerID:          p.ID,
+	// 		PlayerDisplayName: p.DisplayName,
+	// 		RowNum:            ps.RowNum,
+	// 	})
+	// }
+	// sort.Slice(ranks, func(i, j int) bool {
+	// 	if ranks[i].Score == ranks[j].Score {
+	// 		return ranks[i].RowNum < ranks[j].RowNum
+	// 	}
+	// 	return ranks[i].Score > ranks[j].Score
+	// })
+	// pagedRanks := make([]CompetitionRank, 0, 100)
+	// for i, rank := range ranks {
+	// 	if int64(i) < rankAfter {
+	// 		continue
+	// 	}
+	// 	pagedRanks = append(pagedRanks, CompetitionRank{
+	// 		Rank:              int64(i + 1),
+	// 		Score:             rank.Score,
+	// 		PlayerID:          rank.PlayerID,
+	// 		PlayerDisplayName: rank.PlayerDisplayName,
+	// 	})
+	// 	if len(pagedRanks) >= 100 {
+	// 		break
+	// 	}
+	// }
 
 	res := SuccessResult{
 		Status: true,
@@ -1505,7 +1542,7 @@ func competitionRankingHandler(c echo.Context) error {
 				Title:      competition.Title,
 				IsFinished: competition.FinishedAt.Valid,
 			},
-			Ranks: pagedRanks,
+			Ranks: ranks,
 		},
 	}
 	return c.JSON(http.StatusOK, res)
