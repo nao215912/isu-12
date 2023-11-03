@@ -243,7 +243,7 @@ func parseViewer(c echo.Context) (*Viewer, error) {
 	}
 	tokenStr := cookie.Value
 
-	keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "../public.pem")
+	// keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "../public.pem")
 	keysrc := []byte(`-----BEGIN PUBLIC KEY-----
 	MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnBHNAPVGsGozQRc1oqP8
 	/+pMgmDoLOw3Y561wYBnQ5+odh7YzQwk7bTNwKJM2mEngp86d9/nEz0PSBd+PksO
