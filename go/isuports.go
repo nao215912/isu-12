@@ -31,8 +31,8 @@ import (
 )
 
 const (
-	tenantDBSchemaFilePath = "/home/isucon/webapp/go/sql/tenant/10_schema.sql"
-	initializeScript       = "/home/isucon/webapp/go/sql/init.sh"
+	tenantDBSchemaFilePath = "/home/isucon/webapp//sql/tenant/10_schema.sql"
+	initializeScript       = "/home/isucon/webapp//sql/init.sh"
 	cookieName             = "isuports_session"
 
 	RoleAdmin     = "admin"
@@ -73,7 +73,7 @@ func connectAdminDB() (*sqlx.DB, error) {
 
 // テナントDBのパスを返す
 func tenantDBPath(id int64) string {
-	tenantDBDir := getEnv("ISUCON_TENANT_DB_DIR", "/home/isucon/webapp/go/tenant_db")
+	tenantDBDir := getEnv("ISUCON_TENANT_DB_DIR", "/home/isucon/webapp//tenant_db")
 	return filepath.Join(tenantDBDir, fmt.Sprintf("%d.db", id))
 }
 
@@ -243,7 +243,7 @@ func parseViewer(c echo.Context) (*Viewer, error) {
 	}
 	tokenStr := cookie.Value
 
-	// keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "/home/isucon/webapp/go/public.pem")
+	// keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "/home/isucon/webapp//public.pem")
 	keysrc := []byte(`-----BEGIN PUBLIC KEY-----
 	MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnBHNAPVGsGozQRc1oqP8
 	/+pMgmDoLOw3Y561wYBnQ5+odh7YzQwk7bTNwKJM2mEngp86d9/nEz0PSBd+PksO
@@ -466,7 +466,7 @@ func UnlockTenant(tenantID int64) {
 
 // 排他ロックのためのファイル名を生成する
 func lockFilePath(id int64) string {
-	tenantDBDir := getEnv("ISUCON_TENANT_DB_DIR", "/home/isucon/webapp/go/tenant_db")
+	tenantDBDir := getEnv("ISUCON_TENANT_DB_DIR", "/home/isucon/webapp//tenant_db")
 	return filepath.Join(tenantDBDir, fmt.Sprintf("%d.lock", id))
 }
 
