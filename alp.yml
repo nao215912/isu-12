@@ -1,0 +1,44 @@
+- request: "/api/admin/tenants/add"
+  regexp: "^/api/admin/tenants/add$"
+
+- request: "/api/admin/tenants/billing"
+  regexp: "^/api/admin/tenants/billing$"
+
+- request: "/api/organizer/players"
+  regexp: "^/api/organizer/players$"
+
+- request: "/api/organizer/players/add"
+  regexp: "^/api/organizer/players/add$"
+
+- request: "/api/organizer/player/:player_id/disqualified"
+  regexp: "^/api/organizer/player/[^/]+/disqualified$"
+
+- request: "/api/organizer/competitions/add"
+  regexp: "^/api/organizer/competitions/add$"
+
+- request: "/api/organizer/competition/:competition_id/finish"
+  regexp: "^/api/organizer/competition/[^/]+/finish$"
+
+- request: "/api/organizer/competition/:competition_id/score"
+  regexp: "^/api/organizer/competition/[^/]+/score$"
+
+- request: "/api/organizer/billing"
+  regexp: "^/api/organizer/billing$"
+
+- request: "/api/organizer/competitions"
+  regexp: "^/api/organizer/competitions$"
+
+- request: "/api/player/player/:player_id"
+  regexp: "^/api/player/player/[^/]+$"
+
+- request: "/api/player/competition/:competition_id/ranking"
+  regexp: "^/api/player/competition/[^/]+/ranking$"
+
+- request: "/api/player/competitions"
+  regexp: "^/api/player/competitions$"
+
+- request: "/api/me"
+  regexp: "^/api/me$"
+
+- request: "/initialize"
+  regexp: "^/initialize$"
