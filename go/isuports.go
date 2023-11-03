@@ -16,10 +16,10 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/gofrs/flock"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -421,21 +421,68 @@ type PlayerScoreRow struct {
 	UpdatedAt     int64  `db:"updated_at"`
 }
 
+// TenantLocks はテナントIDごとにMutexを保持するマップです。
+var TenantLocks = make(map[int64]*sync.Mutex)
+
+// MutexMapLock はTenantLocksへのアクセスを同期するためのMutexです。
+var MutexMapLock = &sync.Mutex{}
+
+// LockTenant は指定されたテナントIDに対する排他ロックを取得します。
+func LockTenant(tenantID int64) {
+	// TenantLocksマップへのアクセスを同期する
+	MutexMapLock.Lock()
+	// まだそのテナントIDのためのMutexがなければ作成する
+	if _, exists := TenantLocks[tenantID]; !exists {
+		TenantLocks[tenantID] = &sync.Mutex{}
+	}
+	m := TenantLocks[tenantID]
+	MutexMapLock.Unlock()
+
+	// Mutexでロックする
+	m.Lock()
+}
+
+// UnlockTenant は指定されたテナントIDに対する排他ロックを解放します。
+func UnlockTenant(tenantID int64) {
+	// TenantLocksマップへのアクセスを同期する
+	MutexMapLock.Lock()
+	m, exists := TenantLocks[tenantID]
+	if !exists {
+		// これは起こり得ないが、もし起こったらパニックになる
+		panic(fmt.Sprintf("Try to unlock a non-existent lock for tenant ID: %d", tenantID))
+	}
+	MutexMapLock.Unlock()
+
+	// Mutexでアンロックする
+	m.Unlock()
+}
+
 // 排他ロックのためのファイル名を生成する
 func lockFilePath(id int64) string {
 	tenantDBDir := getEnv("ISUCON_TENANT_DB_DIR", "../tenant_db")
 	return filepath.Join(tenantDBDir, fmt.Sprintf("%d.lock", id))
 }
 
+type mutexCloser struct {
+	tenantID int64
+}
+
+func (m *mutexCloser) Close() error {
+	UnlockTenant(m.tenantID)
+	return nil
+}
+
 // 排他ロックする
 func flockByTenantID(tenantID int64) (io.Closer, error) {
-	p := lockFilePath(tenantID)
+	// p := lockFilePath(tenantID)
 
-	fl := flock.New(p)
-	if err := fl.Lock(); err != nil {
-		return nil, fmt.Errorf("error flock.Lock: path=%s, %w", p, err)
-	}
-	return fl, nil
+	// fl := flock.New(p)
+	// if err := fl.Lock(); err != nil {
+	// 	return nil, fmt.Errorf("error flock.Lock: path=%s, %w", p, err)
+	// }
+	// return fl, nil
+	LockTenant(tenantID)
+	return &mutexCloser{tenantID: tenantID}, nil
 }
 
 type TenantsAddHandlerResult struct {
@@ -1107,17 +1154,17 @@ func competitionScoreHandler(c echo.Context) error {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
 	for _, ps := range playerScoreRows {
-		if _, err := tenantDB.NamedExecContext(
-			ctx,
-			"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
-			ps,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
-				ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
-			)
+	if _, err := tenantDB.NamedExecContext(
+	ctx,
+	"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
+	ps,
+	); err != nil {
+	return fmt.Errorf(
+	"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
+	ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
+	)
 
-		}
+	}
 	}
 
 	return c.JSON(http.StatusOK, SuccessResult{
@@ -1366,55 +1413,55 @@ func competitionRankingHandler(c echo.Context) error {
 	}
 	defer fl.Close()
 	pss := []PlayerScoreRow{}
-	if err := tenantDB.SelectContext(
+		if err := tenantDB.SelectContext(
 		ctx,
 		&pss,
 		"SELECT * FROM player_score WHERE tenant_id = ? AND competition_id = ? ORDER BY row_num DESC",
 		tenant.ID,
 		competitionID,
-	); err != nil {
+			); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
 	}
-	ranks := make([]CompetitionRank, 0, len(pss))
+ranks := make([]CompetitionRank, 0, len(pss))
 	scoredPlayerSet := make(map[string]struct{}, len(pss))
 	for _, ps := range pss {
-		// player_scoreが同一player_id内ではrow_numの降順でソートされているので
-		// 現れたのが2回目以降のplayer_idはより大きいrow_numでスコアが出ているとみなせる
-		if _, ok := scoredPlayerSet[ps.PlayerID]; ok {
-			continue
-		}
+	// player_scoreが同一player_id内ではrow_numの降順でソートされているので
+	// 現れたのが2回目以降のplayer_idはより大きいrow_numでスコアが出ているとみなせる
+	if _, ok := scoredPlayerSet[ps.PlayerID]; ok {
+	continue
+	}
 		scoredPlayerSet[ps.PlayerID] = struct{}{}
-		p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
-		if err != nil {
-			return fmt.Errorf("error retrievePlayer: %w", err)
-		}
+	p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
+	if err != nil {
+	return fmt.Errorf("error retrievePlayer: %w", err)
+	}
 		ranks = append(ranks, CompetitionRank{
-			Score:             ps.Score,
-			PlayerID:          p.ID,
-			PlayerDisplayName: p.DisplayName,
-			RowNum:            ps.RowNum,
-		})
+	Score:             ps.Score,
+	PlayerID:          p.ID,
+	PlayerDisplayName: p.DisplayName,
+	RowNum:            ps.RowNum,
+	})
 	}
 	sort.Slice(ranks, func(i, j int) bool {
-		if ranks[i].Score == ranks[j].Score {
-			return ranks[i].RowNum < ranks[j].RowNum
-		}
+	if ranks[i].Score == ranks[j].Score {
+	return ranks[i].RowNum < ranks[j].RowNum
+	}
 		return ranks[i].Score > ranks[j].Score
 	})
 	pagedRanks := make([]CompetitionRank, 0, 100)
 	for i, rank := range ranks {
-		if int64(i) < rankAfter {
-			continue
-		}
+	if int64(i) < rankAfter {
+	continue
+	}
 		pagedRanks = append(pagedRanks, CompetitionRank{
-			Rank:              int64(i + 1),
-			Score:             rank.Score,
-			PlayerID:          rank.PlayerID,
-			PlayerDisplayName: rank.PlayerDisplayName,
-		})
-		if len(pagedRanks) >= 100 {
-			break
-		}
+	Rank:              int64(i + 1),
+	Score:             rank.Score,
+	PlayerID:          rank.PlayerID,
+	PlayerDisplayName: rank.PlayerDisplayName,
+	})
+	if len(pagedRanks) >= 100 {
+	break
+	}
 	}
 
 	res := SuccessResult{
