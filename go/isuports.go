@@ -243,17 +243,11 @@ func parseViewer(c echo.Context) (*Viewer, error) {
 	}
 	tokenStr := cookie.Value
 
-	// keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "/home/isucon/webapp//public.pem")
-	keysrc := []byte(`-----BEGIN PUBLIC KEY-----
-	MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAnBHNAPVGsGozQRc1oqP8
-	/+pMgmDoLOw3Y561wYBnQ5+odh7YzQwk7bTNwKJM2mEngp86d9/nEz0PSBd+PksO
-	EEPFy7ki/Qbxrc3HUqvshS9hY+EBcfSkq6wb2aPS9gQb/ayqE3V9wbf36Mn2E/4U
-	TN2DyHYK1JuECVRDCH1z5BU+v4jxmV1RMddaZvjiUF8PifdkceSi8xA8KeDVVg/T
-	YAqRo9+cEEFmV7Yi9ov+BdMTaCC5JY2U2enl4aaE9ebjthEwGKS8KClXpCnHK4mN
-	iAByANWypdKupDll58djdHT6OXkGoTgDa/jK19PjLh+GRVqlvjA04PVGhoOIUeOM
-	xwIDAQAB
-	-----END PUBLIC KEY-----
-	`)
+	keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "/home/isucon/webapp//public.pem")
+	keysrc, err := os.ReadFile(keyFilename)
+	if err != nil {
+		return nil, fmt.Errorf("error os.RemoveAll: %w", err)
+	}
 	key, _, err := jwk.DecodePEM(keysrc)
 	if err != nil {
 		return nil, fmt.Errorf("error jwk.DecodePEM: %w", err)
