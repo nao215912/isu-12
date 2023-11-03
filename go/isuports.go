@@ -483,7 +483,7 @@ func flockByTenantID(tenantID int64) (io.Closer, error) {
 	// }
 	// return fl, nil
 	LockTenant(tenantID)
-	return &mutexCloser{}, nil
+	return &mutexCloser{tenantID: tenantID}, nil
 }
 
 type TenantsAddHandlerResult struct {
