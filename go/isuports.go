@@ -369,7 +369,7 @@ type PlayerRow struct {
 }
 
 // 参加者を取得する
-func retrievePlayer(ctx context.Context, tenantDB dbOrTx, id string) (*PlayerRow, error) {
+func 	retrievePlayer(ctx context.Context, tenantDB dbOrTx, id string) (*PlayerRow, error) {
 	var p PlayerRow
 	if err := tenantDB.GetContext(ctx, &p, "SELECT * FROM player WHERE id = ?", id); err != nil {
 		return nil, fmt.Errorf("error Select player: id=%s, %w", id, err)
@@ -1154,24 +1154,56 @@ func competitionScoreHandler(c echo.Context) error {
 	); err != nil {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
-	for _, ps := range playerScoreRows {
-		if _, err := tenantDB.NamedExecContext(
-			ctx,
-			"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
-			ps,
-		); err != nil {
-			return fmt.Errorf(
-				"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
-				ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
-			)
+	// for _, ps := range playerScoreRows {
+	// 	if _, err := tenantDB.NamedExecContext(
+	// 		ctx,
+	// 		"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
+	// 		ps,
+	// 	); err != nil {
+	// 		return fmt.Errorf(
+	// 			"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
+	// 			ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
+	// 		)
 
-		}
+	// 	}
+	// }
+	if err := bulkInsertPlayerScores(ctx, tenantDB, playerScoreRows); err != nil {
+		return fmt.Errorf("error bulkInsertPlayerScores: %w", err)
 	}
 
 	return c.JSON(http.StatusOK, SuccessResult{
 		Status: true,
 		Data:   ScoreHandlerResult{Rows: int64(len(playerScoreRows))},
 	})
+}
+
+func bulkInsertPlayerScores(ctx context.Context, db *sqlx.DB, playerScores []PlayerScoreRow) error {
+	valueStrings := make([]string, 0, len(playerScores))
+	valueArgs := make([]interface{}, 0, len(playerScores)*8) // 8 fields to insert per record
+
+
+	for _, ps := range playerScores {
+		valueStrings = append(valueStrings, "(?, ?, ?, ?, ?, ?, ?, ?)")
+		valueArgs = append(valueArgs, ps.ID)
+		valueArgs = append(valueArgs, ps.TenantID)
+		valueArgs = append(valueArgs, ps.PlayerID)
+		valueArgs = append(valueArgs, ps.CompetitionID)
+		valueArgs = append(valueArgs, ps.Score)
+		valueArgs = append(valueArgs, ps.RowNum)
+		valueArgs = append(valueArgs, ps.CreatedAt)
+		valueArgs = append(valueArgs, ps.UpdatedAt)
+	}
+
+	stmt, args, err := sqlx.In(fmt.Sprintf(`INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES %s`, strings.Join(valueStrings, ",")), valueArgs...)
+	if err != nil {
+		return fmt.Errorf("error in bulk insert player_score: %w", err)
+	}
+
+	stmt = db.Rebind(stmt)
+	if _, err := db.ExecContext(ctx, stmt, args...); err != nil {
+		return fmt.Errorf("error in bulk insert player_score: %w", err)
+	}
+	return nil
 }
 
 type BillingHandlerResult struct {
