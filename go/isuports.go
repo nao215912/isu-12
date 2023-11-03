@@ -16,10 +16,11 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/gofrs/flock"
+	// "github.com/gofrs/flock"
 	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
@@ -421,21 +422,68 @@ type PlayerScoreRow struct {
 	UpdatedAt     int64  `db:"updated_at"`
 }
 
+// TenantLocks はテナントIDごとにMutexを保持するマップです。
+var TenantLocks = make(map[int64]*sync.Mutex)
+
+// MutexMapLock はTenantLocksへのアクセスを同期するためのMutexです。
+var MutexMapLock = &sync.Mutex{}
+
+// LockTenant は指定されたテナントIDに対する排他ロックを取得します。
+func LockTenant(tenantID int64) {
+	// TenantLocksマップへのアクセスを同期する
+	MutexMapLock.Lock()
+	// まだそのテナントIDのためのMutexがなければ作成する
+	if _, exists := TenantLocks[tenantID]; !exists {
+		TenantLocks[tenantID] = &sync.Mutex{}
+	}
+	m := TenantLocks[tenantID]
+	MutexMapLock.Unlock()
+
+	// Mutexでロックする
+	m.Lock()
+}
+
+// UnlockTenant は指定されたテナントIDに対する排他ロックを解放します。
+func UnlockTenant(tenantID int64) {
+	// TenantLocksマップへのアクセスを同期する
+	MutexMapLock.Lock()
+	m, exists := TenantLocks[tenantID]
+	if !exists {
+		// これは起こり得ないが、もし起こったらパニックになる
+		panic(fmt.Sprintf("Try to unlock a non-existent lock for tenant ID: %d", tenantID))
+	}
+	MutexMapLock.Unlock()
+
+	// Mutexでアンロックする
+	m.Unlock()
+}
+
 // 排他ロックのためのファイル名を生成する
 func lockFilePath(id int64) string {
 	tenantDBDir := getEnv("ISUCON_TENANT_DB_DIR", "../tenant_db")
 	return filepath.Join(tenantDBDir, fmt.Sprintf("%d.lock", id))
 }
 
+type mutexCloser struct {
+	tenantID int64
+}
+
+func (m *mutexCloser) Close() error {
+	UnlockTenant(m.tenantID)
+	return nil
+}
+
 // 排他ロックする
 func flockByTenantID(tenantID int64) (io.Closer, error) {
-	p := lockFilePath(tenantID)
+	// p := lockFilePath(tenantID)
 
-	fl := flock.New(p)
-	if err := fl.Lock(); err != nil {
-		return nil, fmt.Errorf("error flock.Lock: path=%s, %w", p, err)
-	}
-	return fl, nil
+	// fl := flock.New(p)
+	// if err := fl.Lock(); err != nil {
+	// 	return nil, fmt.Errorf("error flock.Lock: path=%s, %w", p, err)
+	// }
+	// return fl, nil
+	LockTenant(tenantID)
+	return &mutexCloser{}, nil
 }
 
 type TenantsAddHandlerResult struct {
