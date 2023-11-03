@@ -1,16 +1,2 @@
 #!/bin/bash
-cat /var/log/nginx/access.log | alp json -m '^/api/admin/tenants/add$' \
-                                     -m '^/api/admin/tenants/billing$' \
-                                     -m '^/api/organizer/players$' \
-                                     -m '^/api/organizer/players/add$' \
-                                     -m '^/api/organizer/player/[^/]+/disqualified$' \
-                                     -m '^/api/organizer/competitions/add$' \
-                                     -m '^/api/organizer/competition/[^/]+/finish$' \
-                                     -m '^/api/organizer/competition/[^/]+/score$' \
-                                     -m '^/api/organizer/billing$' \
-                                     -m '^/api/organizer/competitions$' \
-                                     -m '^/api/player/player/[^/]+$' \
-                                     -m '^/api/player/competition/[^/]+/ranking$' \
-                                     -m '^/api/player/competitions$' \
-                                     -m '^/api/me$' \
-                                     -m '^/initialize$'
+sudo cat /var/log/nginx/access.log | alp json  -m '^/api/admin/tenants/add$,^/api/admin/tenants/billing$,^/api/organizer/players$,^/api/organizer/players/add$,^/api/organizer/player/[^/]+/disqualified$,^/api/organizer/competitions/add$,^/api/organizer/competition/[^/]+/finish$,^/api/organizer/competition/[^/]+/score$,^/api/organizer/billing$,^/api/organizer/competitions$,^/api/player/player/[^/]+$,^/api/player/competition/[^/]+/ranking$,^/api/player/competitions$,^/api/me$,^/initialize$'
