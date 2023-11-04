@@ -1445,7 +1445,7 @@ func competitionRankingHandler(c echo.Context) error {
 	defer fl.Close()
 	limit := int64(100)
 	if rankAfter < 100 && rankAfter > 0 {
-		limit = 100 - rankAfter
+		limit = 99 - rankAfter
 	}
 	// pss := []PlayerScoreRow{}
 ranks := []CompetitionRank{}
