@@ -1474,12 +1474,13 @@ ranks := []CompetitionRank{}
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100 
+		100 - ? + 1
 	OFFSET
 		? - 1
 	`,
 		tenant.ID,
 		competitionID,
+		rankAfter,
 		rankAfter,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
