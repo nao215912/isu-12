@@ -1462,7 +1462,7 @@ ranks := []CompetitionRank{}
 	INNER JOIN (
 		SELECT
 			player_id,
-			MAX(row_num) as max_row_num.
+			MAX(row_num) as max_row_num,
 			MAX(competition_id) as competition_id,
 			MAX(tenant_id) as tenant_id
 		FROM
