@@ -1474,7 +1474,7 @@ func competitionRankingHandler(c echo.Context) error {
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100 
+		99 
 	OFFSET
 		?
 	`,
