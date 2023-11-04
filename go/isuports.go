@@ -1471,18 +1471,11 @@ func competitionRankingHandler(c echo.Context) error {
 		GROUP BY
 			player_id
 	) as sub_ps ON ps.player_id = sub_ps.player_id AND ps.row_num = sub_ps.max_row_num
-	WHERE
-		ps.tenant_id = ?
-		AND ps.competition_id = ?
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100
-	OFFSET
-		?
+		100 + ?
 	`,
-		tenant.ID,
-		competitionID,
 		tenant.ID,
 		competitionID,
 		rankAfter,
@@ -1540,7 +1533,7 @@ func competitionRankingHandler(c echo.Context) error {
 				Title:      competition.Title,
 				IsFinished: competition.FinishedAt.Valid,
 			},
-			Ranks: ranks,
+			Ranks: ranks[rankAfter:],
 		},
 	}
 	return c.JSON(http.StatusOK, res)
