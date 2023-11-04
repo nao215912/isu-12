@@ -1480,7 +1480,7 @@ func competitionRankingHandler(c echo.Context) error {
 	`,
 		tenant.ID,
 		competitionID,
-		rankAfter,
+		rankAfter - 1,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
 	}
