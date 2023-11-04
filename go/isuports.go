@@ -1474,7 +1474,7 @@ ranks := []CompetitionRank{}
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100 + ?
+		200
 	`,
 		tenant.ID,
 		competitionID,
