@@ -1443,6 +1443,10 @@ func competitionRankingHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
+	limit := int64(100)
+	if rankAfter < 100 && rankAfter > 0 {
+		limit = 100 - rankAfter
+	}
 	// pss := []PlayerScoreRow{}
 ranks := []CompetitionRank{}
 	if err := tenantDB.SelectContext(
@@ -1474,13 +1478,13 @@ ranks := []CompetitionRank{}
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100 + ?
+		?
 	OFFSET
 		? - 1
 	`,
 		tenant.ID,
 		competitionID,
-		rankAfter,
+		limit,
 		rankAfter,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
@@ -1536,7 +1540,7 @@ ranks := []CompetitionRank{}
 				Title:      competition.Title,
 				IsFinished: competition.FinishedAt.Valid,
 			},
-			Ranks: ranks[:101 -rankAfter],
+			Ranks: ranks,
 		},
 	}
 	return c.JSON(http.StatusOK, res)
