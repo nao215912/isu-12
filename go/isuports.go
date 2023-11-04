@@ -1363,11 +1363,11 @@ func playerHandler(c echo.Context) error {
 }
 
 type CompetitionRank struct {
-	Rank              int64  `json:"rank"`
-	Score             int64  `json:"score"`
-	PlayerID          string `json:"player_id"`
-	PlayerDisplayName string `json:"player_display_name"`
-	RowNum            int64  `json:"-"` // APIレスポンスのJSONには含まれない
+	Rank              int64  `json:"rank" db:"rank"`
+	Score             int64  `json:"score" db:"score"`
+	PlayerID          string `json:"player_id" db:"player_id"`
+	PlayerDisplayName string `json:"player_display_name" db:"player_display_name"`
+	RowNum            int64  `json:"-" db:"row_num"` // APIレスポンスのJSONには含まれない
 }
 
 type CompetitionRankingHandlerResult struct {
