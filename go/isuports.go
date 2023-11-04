@@ -474,13 +474,6 @@ func (m *mutexCloser) Close() error {
 
 // 排他ロックする
 func flockByTenantID(tenantID int64) (io.Closer, error) {
-	// p := lockFilePath(tenantID)
-
-	// fl := flock.New(p)
-	// if err := fl.Lock(); err != nil {
-	// 	return nil, fmt.Errorf("error flock.Lock: path=%s, %w", p, err)
-	// }
-	// return fl, nil
 	LockTenant(tenantID)
 	return &mutexCloser{tenantID: tenantID}, nil
 }
@@ -1153,19 +1146,6 @@ func competitionScoreHandler(c echo.Context) error {
 	); err != nil {
 		return fmt.Errorf("error Delete player_score: tenantID=%d, competitionID=%s, %w", v.tenantID, competitionID, err)
 	}
-	// for _, ps := range playerScoreRows {
-	// 	if _, err := tenantDB.NamedExecContext(
-	// 		ctx,
-	// 		"INSERT INTO player_score (id, tenant_id, player_id, competition_id, score, row_num, created_at, updated_at) VALUES (:id, :tenant_id, :player_id, :competition_id, :score, :row_num, :created_at, :updated_at)",
-	// 		ps,
-	// 	); err != nil {
-	// 		return fmt.Errorf(
-	// 			"error Insert player_score: id=%s, tenant_id=%d, playerID=%s, competitionID=%s, score=%d, rowNum=%d, createdAt=%d, updatedAt=%d, %w",
-	// 			ps.ID, ps.TenantID, ps.PlayerID, ps.CompetitionID, ps.Score, ps.RowNum, ps.CreatedAt, ps.UpdatedAt, err,
-	// 		)
-
-	// 	}
-	// }
 	if err := bulkInsertPlayerScores(ctx, tenantDB, playerScoreRows); err != nil {
 		return fmt.Errorf("error bulkInsertPlayerScores: %w", err)
 	}
@@ -1471,26 +1451,6 @@ ranks := []CompetitionRank{}
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
 	}
 
-	// scoredPlayerSet := make(map[string]struct{}, len(pss))
-	// for _, ps := range pss {
-	// 	// player_scoreが同一player_id内ではrow_numの降順でソートされているので
-	// 	// 現れたのが2回目以降のplayer_idはより大きいrow_numでスコアが出ているとみなせる
-	// 	if _, ok := scoredPlayerSet[ps.PlayerID]; ok {
-	// 		continue
-	// 	}
-	// 	scoredPlayerSet[ps.PlayerID] = struct{}{}
-	// 	// "SELECT * FROM player WHERE id = ?"
-	// 	p, err := retrievePlayer(ctx, tenantDB, ps.PlayerID)
-	// 	if err != nil {
-	// 		return fmt.Errorf("error retrievePlayer: %w", err)
-	// 	}
-	// 	ranks = append(ranks, CompetitionRank{
-	// 		Score:             ps.Score,
-	// 		PlayerID:          p.ID,
-	// 		PlayerDisplayName: p.DisplayName,
-	// 		RowNum:            ps.RowNum,
-	// 	})
-	// }
 	sort.Slice(ranks, func(i, j int) bool {
 		if ranks[i].Score == ranks[j].Score {
 			return ranks[i].RowNum < ranks[j].RowNum
