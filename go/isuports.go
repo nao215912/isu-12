@@ -1453,7 +1453,7 @@ func competitionRankingHandler(c echo.Context) error {
 		ROW_NUMBER() OVER (ORDER BY ps.score DESC, ps.row_num DESC) as rank,
 		ps.score as score,
 		ps.player_id as player_id,
-		p.display_name as player_display_name
+		p.display_name as player_display_name,
 		ps.row_num as row_num
 	FROM
 		player_score as ps
@@ -1474,7 +1474,9 @@ func competitionRankingHandler(c echo.Context) error {
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100 + ?
+		100 
+	OFFSET
+		?
 	`,
 		tenant.ID,
 		competitionID,
@@ -1533,7 +1535,7 @@ func competitionRankingHandler(c echo.Context) error {
 				Title:      competition.Title,
 				IsFinished: competition.FinishedAt.Valid,
 			},
-			Ranks: ranks[rankAfter:],
+			Ranks: ranks,
 		},
 	}
 	return c.JSON(http.StatusOK, res)
