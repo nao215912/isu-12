@@ -623,18 +623,33 @@ func billingReportByCompetition(ctx context.Context, tenantDB dbOrTx, tenantID i
 	if err := adminDB.SelectContext(
 		ctx,
 		&vhs,
-		"SELECT player_id, MIN(created_at) AS min_created_at FROM visit_history WHERE tenant_id = ? AND competition_id = ? GROUP BY player_id",
+		`
+		SELECT 
+			player_id, 
+			MIN(created_at) AS min_created_at 
+		FROM 
+			visit_history 
+		WHERE 
+			tenant_id = ? 
+		AND 
+			competition_id = ? 
+		GROUP BY 
+			player_id
+		HAVING
+			min_created_at <= ?
+		`,
 		tenantID,
 		comp.ID,
+		comp.FinishedAt,
 	); err != nil && err != sql.ErrNoRows {
 		return nil, fmt.Errorf("error Select visit_history: tenantID=%d, competitionID=%s, %w", tenantID, comp.ID, err)
 	}
 	billingMap := map[string]string{}
 	for _, vh := range vhs {
 		// competition.finished_atよりもあとの場合は、終了後に訪問したとみなして大会開催内アクセス済みとみなさない
-		if comp.FinishedAt.Valid && comp.FinishedAt.Int64 < vh.MinCreatedAt {
-			continue
-		}
+		// if comp.FinishedAt.Valid && comp.FinishedAt.Int64 < vh.MinCreatedAt {
+		// 	continue
+		// }
 		billingMap[vh.PlayerID] = "visitor"
 	}
 
