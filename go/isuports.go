@@ -1443,10 +1443,6 @@ func competitionRankingHandler(c echo.Context) error {
 		return fmt.Errorf("error flockByTenantID: %w", err)
 	}
 	defer fl.Close()
-	limit := int64(100)
-	if rankAfter < 100 && rankAfter > 0 {
-		limit = 99 - rankAfter
-	}
 	// pss := []PlayerScoreRow{}
 ranks := []CompetitionRank{}
 	if err := tenantDB.SelectContext(
@@ -1475,16 +1471,21 @@ ranks := []CompetitionRank{}
 		GROUP BY
 			player_id
 	) as sub_ps ON ps.player_id = sub_ps.player_id AND ps.row_num = sub_ps.max_row_num
+	WHERE
+		ps.tenant_id = ?
+	AND 
+		ps.competition_id = ?
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		?
+		100
 	OFFSET
 		? - 1
 	`,
 		tenant.ID,
 		competitionID,
-		limit,
+		tenant.ID,
+		competitionID,
 		rankAfter,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
