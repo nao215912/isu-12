@@ -13,13 +13,14 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-		"github.com/jmoiron/sqlx"
+	"github.com/jmoiron/sqlx"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"github.com/labstack/gommon/log"
@@ -1450,7 +1451,7 @@ ranks := []CompetitionRank{}
 		&ranks,
 		`
 	SELECT
-		ROW_NUMBER() OVER (ORDER BY ps.score DESC, ps.row_num DESC) as rank,
+		1 as rank,
 		ps.score as score,
 		ps.player_id as player_id,
 		p.display_name as player_display_name,
@@ -1459,39 +1460,13 @@ ranks := []CompetitionRank{}
 		player_score as ps
 	INNER JOIN
 		player as p ON ps.player_id = p.id
-	INNER JOIN (
-		SELECT
-			player_id,
-			MAX(row_num) as max_row_num,
-			MAX(competition_id) as competition_id,
-			MAX(tenant_id) as tenant_id
-		FROM
-			player_score
-		WHERE
-			tenant_id = ?
-			AND competition_id = ?
-		GROUP BY
-			player_id
-	) as sub_ps 
-	ON 
-		ps.player_id = sub_ps.player_id 
-	AND 
-		ps.row_num = sub_ps.max_row_num
+	WHERE
+		ps.tenant_id = ?
 	AND
-		ps.competition_id = sub_ps.competition_id
-	AND
-		ps.tenant_id = sub_ps.tenant_id
-	ORDER BY
-		ps.score DESC, 
-		ps.row_num DESC
-	LIMIT 
-		100
-	OFFSET
-		? - 1
+		ps.competition_id = ?
 	`,
 		tenant.ID,
 		competitionID,
-		rankAfter,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
 	}
@@ -1516,27 +1491,27 @@ ranks := []CompetitionRank{}
 	// 		RowNum:            ps.RowNum,
 	// 	})
 	// }
-	// sort.Slice(ranks, func(i, j int) bool {
-	// 	if ranks[i].Score == ranks[j].Score {
-	// 		return ranks[i].RowNum < ranks[j].RowNum
-	// 	}
-	// 	return ranks[i].Score > ranks[j].Score
-	// })
-	// pagedRanks := make([]CompetitionRank, 0, 100)
-	// for i, rank := range ranks {
-	// 	if int64(i) < rankAfter {
-	// 		continue
-	// 	}
-	// 	pagedRanks = append(pagedRanks, CompetitionRank{
-	// 		Rank:              int64(i + 1),
-	// 		Score:             rank.Score,
-	// 		PlayerID:          rank.PlayerID,
-	// 		PlayerDisplayName: rank.PlayerDisplayName,
-	// 	})
-	// 	if len(pagedRanks) >= 100 {
-	// 		break
-	// 	}
-	// }
+	sort.Slice(ranks, func(i, j int) bool {
+		if ranks[i].Score == ranks[j].Score {
+			return ranks[i].RowNum < ranks[j].RowNum
+		}
+		return ranks[i].Score > ranks[j].Score
+	})
+	pagedRanks := make([]CompetitionRank, 0, 100)
+	for i, rank := range ranks {
+		if int64(i) < rankAfter {
+			continue
+		}
+		pagedRanks = append(pagedRanks, CompetitionRank{
+			Rank:              int64(i + 1),
+			Score:             rank.Score,
+			PlayerID:          rank.PlayerID,
+			PlayerDisplayName: rank.PlayerDisplayName,
+		})
+		if len(pagedRanks) >= 100 {
+			break
+		}
+	}
 
 	res := SuccessResult{
 		Status: true,
@@ -1546,7 +1521,7 @@ ranks := []CompetitionRank{}
 				Title:      competition.Title,
 				IsFinished: competition.FinishedAt.Valid,
 			},
-			Ranks: ranks,
+			Ranks: pagedRanks,
 		},
 	}
 	return c.JSON(http.StatusOK, res)
