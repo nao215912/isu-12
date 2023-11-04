@@ -247,7 +247,11 @@ type CachedFile struct {
 
 // NewCachedFile は新しいCachedFileを作成します。
 func NewCachedFile(filename string) *CachedFile {
-	return &CachedFile{filename: filename}
+	c := &CachedFile{filename: filename}
+	c.once.Do(func() {
+		c.content, c.err = os.ReadFile(c.filename)
+	})
+	return c
 }
 
 var keysrc = NewCachedFile(getEnv("ISUCON_JWT_KEY_FILE", "../public.pem"))
