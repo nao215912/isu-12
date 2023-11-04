@@ -1470,20 +1470,23 @@ ranks := []CompetitionRank{}
 			AND competition_id = ?
 		GROUP BY
 			player_id
-	) as sub_ps ON ps.player_id = sub_ps.player_id AND ps.row_num = sub_ps.max_row_num
-	WHERE
-		ps.tenant_id = ?
+	) as sub_ps 
+	ON 
+		ps.player_id = sub_ps.player_id 
 	AND 
-		ps.competition_id = ?
+		ps.row_num = sub_ps.max_row_num
+	AND
+		ps.competition_id = sub_ps.competition_id
+	AND
+		ps.tenant_id = sub_ps.tenant_id
 	ORDER BY
-		ps.score DESC, ps.row_num DESC
+		ps.score DESC, 
+		ps.row_num DESC
 	LIMIT 
 		100
 	OFFSET
 		? - 1
 	`,
-		tenant.ID,
-		competitionID,
 		tenant.ID,
 		competitionID,
 		rankAfter,
