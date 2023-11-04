@@ -237,6 +237,30 @@ type Viewer struct {
 	tenantID   int64
 }
 
+// CachedFile はキャッシュされたファイルの構造体です。
+type CachedFile struct {
+	once     sync.Once
+	filename string
+	content  []byte
+	err      error
+}
+
+// NewCachedFile は新しいCachedFileを作成します。
+func NewCachedFile(filename string) *CachedFile {
+	return &CachedFile{filename: filename}
+}
+
+var keysrc = NewCachedFile(getEnv("ISUCON_JWT_KEY_FILE", "../public.pem"))
+
+// Read はファイルを読み込み、結果をキャッシュします。
+// このメソッドは複数回呼び出されてもファイルの読み込みは一度だけ行われます。
+func (c *CachedFile) Read() ([]byte, error) {
+	c.once.Do(func() {
+		c.content, c.err = os.ReadFile(c.filename)
+	})
+	return c.content, c.err
+}
+
 // リクエストヘッダをパースしてViewerを返す
 func parseViewer(c echo.Context) (*Viewer, error) {
 	cookie, err := c.Request().Cookie(cookieName)
@@ -248,12 +272,12 @@ func parseViewer(c echo.Context) (*Viewer, error) {
 	}
 	tokenStr := cookie.Value
 
-	keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "../public.pem")
-	keysrc, err := os.ReadFile(keyFilename)
-	if err != nil {
-		return nil, fmt.Errorf("error os.ReadFile: keyFilename=%s: %w", keyFilename, err)
-	}
-	key, _, err := jwk.DecodePEM(keysrc)
+	// keyFilename := getEnv("ISUCON_JWT_KEY_FILE", "../public.pem")
+	// keysrc, err := os.ReadFile(keyFilename)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error os.ReadFile: keyFilename=%s: %w", keyFilename, err)
+	// }
+	key, _, err := jwk.DecodePEM(keysrc.content)
 	if err != nil {
 		return nil, fmt.Errorf("error jwk.DecodePEM: %w", err)
 	}
