@@ -1444,6 +1444,10 @@ func competitionRankingHandler(c echo.Context) error {
 	}
 	defer fl.Close()
 	// pss := []PlayerScoreRow{}
+	limit := 100 -rankAfter
+	if rankAfter >= 100 {
+		limit = 1
+	}
 ranks := []CompetitionRank{}
 	if err := tenantDB.SelectContext(
 		ctx,
@@ -1474,13 +1478,13 @@ ranks := []CompetitionRank{}
 	ORDER BY
 		ps.score DESC, ps.row_num DESC
 	LIMIT 
-		100 - ?
+		?
 	OFFSET
 		? - 1
 	`,
 		tenant.ID,
 		competitionID,
-		rankAfter,
+		limit,
 		rankAfter,
 	); err != nil {
 		return fmt.Errorf("error Select player_score: tenantID=%d, competitionID=%s, %w", tenant.ID, competitionID, err)
